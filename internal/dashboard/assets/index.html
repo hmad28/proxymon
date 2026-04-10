@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proxymon</title>
+  <style>
+__STYLE__
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="hero card">
+      <div class="hero__identity">
+        <div class="hero__title-row">
+          <span id="health-dot" class="health-dot"></span>
+          <h1>PROXYMON</h1>
+        </div>
+        <p id="hero-status" class="hero__status">Waiting for live proxy data.</p>
+      </div>
+      <div class="hero__rates">
+        <div>
+          <span class="metric-label">Upload</span>
+          <strong id="rate-up">0 B/s</strong>
+        </div>
+        <div>
+          <span class="metric-label">Download</span>
+          <strong id="rate-down">0 B/s</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="card graph-card" aria-labelledby="speed-heading">
+      <div class="section-header">
+        <div class="section-heading">
+          <h2 id="speed-heading">Speed</h2>
+          <p id="graph-status" class="section-copy">Waiting for live traffic data from the tray.</p>
+        </div>
+        <span id="graph-range" class="section-meta">Last 60 seconds</span>
+      </div>
+      <div class="graph-legend" aria-label="Current traffic legend">
+        <span class="legend-chip legend-chip--up">Upload <strong id="legend-up">0 B/s</strong></span>
+        <span class="legend-chip legend-chip--down">Download <strong id="legend-down">0 B/s</strong></span>
+      </div>
+      <div class="graph-stage">
+        <canvas id="speed-chart" height="130" role="img" aria-describedby="chart-description"></canvas>
+        <div id="graph-empty" class="graph-empty">
+          <strong id="graph-empty-title">Waiting for live traffic data.</strong>
+          <span id="graph-empty-copy">The tray keeps collecting stats even while this window is hidden.</span>
+        </div>
+      </div>
+      <p id="chart-description" class="sr-only">Traffic chart waiting for data from the tray.</p>
+    </section>
+
+    <section class="stats-grid">
+      <div class="card">
+        <div class="section-header">
+          <h2>Overview</h2>
+        </div>
+        <dl class="stats-list">
+          <div><dt>Mode</dt><dd id="mode">Round-Robin</dd></div>
+          <div><dt>Interfaces</dt><dd id="interfaces-count">0 active</dd></div>
+          <div><dt>Auto Proxy</dt><dd id="auto-proxy">Disabled</dd></div>
+          <div><dt>Total Upload</dt><dd id="total-upload">0 B</dd></div>
+          <div><dt>Total Download</dt><dd id="total-download">0 B</dd></div>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <h2>Connection</h2>
+        </div>
+        <dl class="stats-list">
+          <div><dt>HTTP Proxy</dt><dd id="http-proxy">—</dd></div>
+          <div><dt>SOCKS5</dt><dd id="socks5-proxy">—</dd></div>
+          <div><dt>Active Conn</dt><dd id="active-connections">0</dd></div>
+          <div><dt>Total Conn</dt><dd id="total-connections">0</dd></div>
+          <div><dt>Uptime</dt><dd id="uptime">0s</dd></div>
+          <div><dt>Version</dt><dd id="version">—</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-header">
+        <h2>Interfaces</h2>
+        <span id="interfaces-meta" class="section-meta">Selected interface activity</span>
+      </div>
+      <div id="interfaces-list" class="interfaces-list"></div>
+    </section>
+
+    <section id="error-banner" class="card error-banner hidden" aria-label="Latest error"></section>
+
+    <footer class="footer card">
+      <span id="footer-text">Close this window to hide it. Left-click the tray icon to bring it back.</span>
+      <button id="reset-stats" type="button" aria-describedby="footer-text">Reset Stats</button>
+    </footer>
+  </div>
+
+  <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+__SCRIPT__
+  </script>
+</body>
+</html>

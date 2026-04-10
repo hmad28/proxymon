@@ -1,0 +1,21 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+proxymon.exe
+
+# Claude
+.claude/
+
+# Logs
+*.log
+
+# Dependencies
+vendor/
+
+# OS files
+.DS_Store
+Thumbs.db
