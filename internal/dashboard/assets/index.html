@@ -1,100 +1,213 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html class="dark" lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Proxymon</title>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <title>PROXYMON | Network Monitor</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#99f7ff',
+            'primary-dim': '#00e2ee',
+            'primary-fixed': '#00f1fe',
+            'primary-container': '#00373b',
+            secondary: '#d575ff',
+            'secondary-container': '#9800d0',
+            background: '#0e0e0e',
+            'on-background': '#ffffff',
+            'surface-container-lowest': '#000000',
+            'surface-container-high': '#201f1f',
+            'surface-container-highest': '#262626',
+            'outline-variant': '#484847',
+            error: '#ff716c',
+            'error-container': '#9f0519'
+          },
+          fontFamily: {
+            headline: ['Space Grotesk'],
+            body: ['Space Grotesk'],
+            label: ['Space Grotesk']
+          }
+        }
+      }
+    };
+  </script>
   <style>
 __STYLE__
   </style>
 </head>
-<body>
-  <div class="shell">
-    <header class="hero card">
-      <div class="hero__identity">
-        <div class="hero__title-row">
-          <span id="health-dot" class="health-dot"></span>
-          <h1>PROXYMON</h1>
+<body class="bg-background text-on-background w-screen h-screen overflow-hidden font-body">
+  <div class="pm-frame w-full h-full max-w-[1024px] mx-auto border-x border-outline-variant/10 flex flex-col overflow-hidden">
+    <nav class="pm-topbar h-14 bg-[#0e0e0e]/85 backdrop-blur-md text-[#00f2ff] border-b border-[#00f2ff]/15 shadow-[0_0_40px_-15px_rgba(0,242,255,0.3)] flex items-center justify-between px-4 gap-4 shrink-0">
+      <div class="flex items-center gap-4 min-w-0">
+        <span class="text-2xl font-black text-[#00f2ff] uppercase italic tracking-tight shrink-0">PROXYMON</span>
+        <div id="system-status-pill" data-state="stopped" class="pm-status-pill flex items-center gap-2 px-3 py-1 bg-surface-container-highest/50 border border-primary/20 min-w-0">
+          <span id="health-dot" data-state="stopped" class="status-dot"></span>
+          <span id="system-status" class="text-[10px] font-bold tracking-[0.18em] uppercase truncate">PROXY_STOPPED</span>
         </div>
-        <p id="hero-status" class="hero__status">Waiting for live proxy data.</p>
-      </div>
-      <div class="hero__rates">
-        <div>
-          <span class="metric-label">Upload</span>
-          <strong id="rate-up">0 B/s</strong>
-        </div>
-        <div>
-          <span class="metric-label">Download</span>
-          <strong id="rate-down">0 B/s</strong>
-        </div>
-      </div>
-    </header>
-
-    <section class="card graph-card" aria-labelledby="speed-heading">
-      <div class="section-header">
-        <div class="section-heading">
-          <h2 id="speed-heading">Speed</h2>
-          <p id="graph-status" class="section-copy">Waiting for live traffic data from the tray.</p>
-        </div>
-        <span id="graph-range" class="section-meta">Last 60 seconds</span>
-      </div>
-      <div class="graph-legend" aria-label="Current traffic legend">
-        <span class="legend-chip legend-chip--up">Upload <strong id="legend-up">0 B/s</strong></span>
-        <span class="legend-chip legend-chip--down">Download <strong id="legend-down">0 B/s</strong></span>
-      </div>
-      <div class="graph-stage">
-        <canvas id="speed-chart" height="130" role="img" aria-describedby="chart-description"></canvas>
-        <div id="graph-empty" class="graph-empty">
-          <strong id="graph-empty-title">Waiting for live traffic data.</strong>
-          <span id="graph-empty-copy">The tray keeps collecting stats even while this window is hidden.</span>
-        </div>
-      </div>
-      <p id="chart-description" class="sr-only">Traffic chart waiting for data from the tray.</p>
-    </section>
-
-    <section class="stats-grid">
-      <div class="card">
-        <div class="section-header">
-          <h2>Overview</h2>
-        </div>
-        <dl class="stats-list">
-          <div><dt>Mode</dt><dd id="mode">Round-Robin</dd></div>
-          <div><dt>Interfaces</dt><dd id="interfaces-count">0 active</dd></div>
-          <div><dt>Auto Proxy</dt><dd id="auto-proxy">Disabled</dd></div>
-          <div><dt>Total Upload</dt><dd id="total-upload">0 B</dd></div>
-          <div><dt>Total Download</dt><dd id="total-download">0 B</dd></div>
-        </dl>
       </div>
 
-      <div class="card">
-        <div class="section-header">
-          <h2>Connection</h2>
+      <div class="flex items-center gap-4 shrink-0">
+        <div class="pm-nav-rate pm-nav-rate--up flex items-center gap-2 text-primary font-bold">
+          <span class="material-symbols-outlined text-sm" aria-hidden="true">arrow_upward</span>
+          <span id="nav-rate-up" class="text-base tabular-nums">0 B/s</span>
         </div>
-        <dl class="stats-list">
-          <div><dt>HTTP Proxy</dt><dd id="http-proxy">—</dd></div>
-          <div><dt>SOCKS5</dt><dd id="socks5-proxy">—</dd></div>
-          <div><dt>Active Conn</dt><dd id="active-connections">0</dd></div>
-          <div><dt>Total Conn</dt><dd id="total-connections">0</dd></div>
-          <div><dt>Uptime</dt><dd id="uptime">0s</dd></div>
-          <div><dt>Version</dt><dd id="version">—</dd></div>
-        </dl>
+        <div class="pm-nav-rate pm-nav-rate--down flex items-center gap-2 text-secondary font-bold">
+          <span class="material-symbols-outlined text-sm" aria-hidden="true">arrow_downward</span>
+          <span id="nav-rate-down" class="text-base tabular-nums">0 B/s</span>
+        </div>
       </div>
-    </section>
+    </nav>
 
-    <section class="card">
-      <div class="section-header">
-        <h2>Interfaces</h2>
-        <span id="interfaces-meta" class="section-meta">Selected interface activity</span>
-      </div>
-      <div id="interfaces-list" class="interfaces-list"></div>
-    </section>
+    <main class="pm-main flex-1 min-h-0 p-3 flex flex-col gap-3 overflow-hidden">
+      <section class="pm-summary-grid grid grid-cols-2 gap-3 shrink-0">
+        <article class="glass-panel p-4 flex flex-col gap-3 border-l-4 border-l-primary relative overflow-hidden min-h-0">
+          <div class="absolute top-[-18%] right-[-8%] w-28 h-28 bg-primary/5 blur-3xl pointer-events-none"></div>
+          <div class="flex justify-between items-start gap-3">
+            <div class="min-w-0">
+              <span class="text-[10px] uppercase tracking-widest text-primary mb-1 block">System Overview</span>
+              <h2 id="mode" class="text-[26px] leading-none font-black italic tracking-tight uppercase break-words">ROUND-ROBIN</h2>
+            </div>
+            <div class="flex flex-col items-end shrink-0">
+              <span class="text-[10px] text-gray-500 uppercase font-bold">Auto Proxy</span>
+              <div id="auto-proxy-toggle" data-enabled="false" class="pm-toggle mt-2" aria-hidden="true"><div class="pm-toggle__knob"></div></div>
+            </div>
+          </div>
 
-    <section id="error-banner" class="card error-banner hidden" aria-label="Latest error"></section>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-surface-container-highest/40 p-3 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block mb-1">Total Data Out</span>
+              <span id="total-upload" class="text-lg font-bold tabular-nums">0 B</span>
+            </div>
+            <div class="bg-surface-container-highest/40 p-3 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block mb-1">Total Data In</span>
+              <span id="total-download" class="text-lg font-bold tabular-nums">0 B</span>
+            </div>
+          </div>
 
-    <footer class="footer card">
-      <span id="footer-text">Close this window to hide it. Left-click the tray icon to bring it back.</span>
-      <button id="reset-stats" type="button" aria-describedby="footer-text">Reset Stats</button>
-    </footer>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-surface-container-highest/30 p-3 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block mb-1">Active Interfaces</span>
+              <span id="interfaces-count" class="text-sm font-bold tabular-nums uppercase">0 ACTIVE</span>
+            </div>
+            <div class="bg-surface-container-highest/30 p-3 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block mb-1">Auto Proxy</span>
+              <span id="auto-proxy" class="text-sm font-bold uppercase">Disabled</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="glass-panel p-4 flex flex-col gap-3 border-l-4 border-l-secondary relative overflow-hidden min-h-0">
+          <div class="absolute top-[-18%] right-[-8%] w-28 h-28 bg-secondary/5 blur-3xl pointer-events-none"></div>
+          <div class="flex justify-between items-start gap-3">
+            <div class="min-w-0">
+              <span class="text-[10px] uppercase tracking-widest text-secondary mb-1 block">Proxy Endpoint</span>
+              <h2 id="http-proxy" class="text-[26px] leading-none font-black italic tracking-tight tabular-nums break-all">—</h2>
+            </div>
+            <div class="text-right shrink-0">
+              <span class="text-[10px] text-gray-500 uppercase font-bold">Version</span>
+              <div id="version" class="text-xs font-bold font-mono mt-1">—</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-surface-container-highest/40 p-2 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block">Uptime</span>
+              <span id="uptime" class="text-sm font-bold tabular-nums">00:00:00</span>
+            </div>
+            <div class="bg-surface-container-highest/40 p-2 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block">Active</span>
+              <span id="active-connections" class="text-sm font-bold tabular-nums">0</span>
+            </div>
+            <div class="bg-surface-container-highest/40 p-2 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block">Total</span>
+              <span id="total-connections" class="text-sm font-bold tabular-nums">0</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-surface-container-highest/30 p-3 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block mb-1">SOCKS5</span>
+              <span id="socks5-proxy" class="text-sm font-bold font-mono break-all">—</span>
+            </div>
+            <div class="bg-surface-container-highest/30 p-3 min-w-0">
+              <span class="text-[9px] uppercase text-gray-500 block mb-1">Status</span>
+              <span id="hero-status" class="text-sm font-bold uppercase">Waiting for live data</span>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="pm-graph-card glass-panel p-3 relative flex flex-col overflow-hidden shrink-0">
+        <div class="flex justify-between items-start gap-4 mb-3 flex-wrap shrink-0">
+          <div class="min-w-0">
+            <h3 class="text-xs font-black uppercase tracking-[0.3em] flex items-center gap-2">
+              <span class="w-1.5 h-4 bg-primary"></span>
+              Traffic Monitor <span class="text-gray-600 font-normal">[LAST 60S]</span>
+            </h3>
+            <p id="graph-status" class="text-[10px] text-gray-500 uppercase tracking-[0.18em] mt-2">Waiting for live traffic data from the tray.</p>
+          </div>
+          <div class="flex gap-4 flex-wrap items-center shrink-0">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-0.5 bg-primary"></div>
+              <span class="text-[9px] font-bold uppercase text-primary">Upload</span>
+              <strong id="legend-up" class="text-[10px] font-bold text-primary tabular-nums">0 B/s</strong>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-0.5 bg-secondary"></div>
+              <span class="text-[9px] font-bold uppercase text-secondary">Download</span>
+              <strong id="legend-down" class="text-[10px] font-bold text-secondary tabular-nums">0 B/s</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="pm-graph-stage flex-1 relative overflow-hidden border border-outline-variant/5 bg-surface-container-lowest min-h-0">
+          <canvas id="speed-chart" class="absolute inset-0 w-full h-full" role="img" aria-describedby="chart-description"></canvas>
+          <div class="pm-graph-axis absolute left-3 top-3 text-[8px] text-gray-600 font-mono flex flex-col justify-between h-[calc(100%-24px)] pointer-events-none">
+            <span id="graph-axis-max">0 B/s</span>
+            <span id="graph-axis-mid">0 B/s</span>
+            <span>0 B/s</span>
+          </div>
+          <div id="graph-empty" class="pm-graph-empty">
+            <strong id="graph-empty-title">Waiting for live traffic data.</strong>
+            <span id="graph-empty-copy">The tray keeps collecting stats even while this window is hidden.</span>
+          </div>
+        </div>
+        <p id="chart-description" class="sr-only">Traffic chart waiting for data from the tray.</p>
+      </section>
+
+      <section class="pm-interfaces-card glass-panel p-3 flex flex-col min-h-0 flex-1 overflow-hidden">
+        <div class="flex justify-between items-center mb-2 gap-3 shrink-0">
+          <h3 class="text-xs font-black uppercase tracking-[0.3em]">Network_Interfaces</h3>
+          <span id="interfaces-meta" class="text-[9px] font-bold text-primary px-2 py-1 bg-primary/10 border border-primary/20 uppercase tracking-[0.2em]">0 ACTIVE</span>
+        </div>
+        <div id="interfaces-list" class="pm-interface-grid flex-1 min-h-0 overflow-auto"></div>
+      </section>
+
+      <section id="error-banner" class="pm-error-banner hidden shrink-0" aria-label="Latest error"></section>
+
+      <footer class="pm-footer flex justify-between items-center py-1 px-1 gap-3 flex-wrap shrink-0">
+        <div class="flex items-center gap-5 flex-wrap min-w-0">
+          <div class="text-[9px] text-gray-600 font-bold tracking-widest uppercase">
+            Uptime: <span id="footer-uptime" class="text-gray-400">00:00:00</span>
+          </div>
+          <div class="text-[9px] text-gray-600 font-bold tracking-widest uppercase">
+            Version: <span id="footer-version" class="text-gray-400">—</span>
+          </div>
+          <div class="text-[9px] text-gray-600 font-bold tracking-widest uppercase min-w-0">
+            Tray: <span id="footer-text" class="text-gray-400">Close this window to hide it. Left-click the tray icon to bring it back.</span>
+          </div>
+        </div>
+        <button id="reset-stats" class="bg-primary text-[#0e0e0e] font-black px-6 py-2 text-[10px] tracking-[0.2em] uppercase hover:bg-primary-dim active:scale-95 transition-all shrink-0" type="button">
+          RESET STATS
+        </button>
+      </footer>
+    </main>
   </div>
 
   <div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>

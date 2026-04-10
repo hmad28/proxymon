@@ -15,12 +15,15 @@ const state = {
 
 const elements = {
   healthDot: document.getElementById('health-dot'),
+  systemStatus: document.getElementById('system-status'),
+  systemStatusPill: document.getElementById('system-status-pill'),
   heroStatus: document.getElementById('hero-status'),
-  rateUp: document.getElementById('rate-up'),
-  rateDown: document.getElementById('rate-down'),
+  navRateUp: document.getElementById('nav-rate-up'),
+  navRateDown: document.getElementById('nav-rate-down'),
   mode: document.getElementById('mode'),
   interfacesCount: document.getElementById('interfaces-count'),
   autoProxy: document.getElementById('auto-proxy'),
+  autoProxyToggle: document.getElementById('auto-proxy-toggle'),
   totalUpload: document.getElementById('total-upload'),
   totalDownload: document.getElementById('total-download'),
   httpProxy: document.getElementById('http-proxy'),
@@ -29,14 +32,17 @@ const elements = {
   totalConnections: document.getElementById('total-connections'),
   uptime: document.getElementById('uptime'),
   version: document.getElementById('version'),
+  footerUptime: document.getElementById('footer-uptime'),
+  footerVersion: document.getElementById('footer-version'),
   interfacesMeta: document.getElementById('interfaces-meta'),
   interfacesList: document.getElementById('interfaces-list'),
   footerText: document.getElementById('footer-text'),
   errorBanner: document.getElementById('error-banner'),
   graphStatus: document.getElementById('graph-status'),
-  graphRange: document.getElementById('graph-range'),
   legendUp: document.getElementById('legend-up'),
   legendDown: document.getElementById('legend-down'),
+  graphAxisMax: document.getElementById('graph-axis-max'),
+  graphAxisMid: document.getElementById('graph-axis-mid'),
   graphEmpty: document.getElementById('graph-empty'),
   graphEmptyTitle: document.getElementById('graph-empty-title'),
   graphEmptyCopy: document.getElementById('graph-empty-copy'),
@@ -47,7 +53,7 @@ const elements = {
 };
 
 function modeLabel(mode) {
-  return mode === 1 ? 'Failover' : 'Round-Robin';
+  return mode === 1 ? 'FAILOVER' : 'ROUND-ROBIN';
 }
 
 function formatBytes(value) {
@@ -74,12 +80,16 @@ function formatDuration(duration) {
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  const parts = [];
-  if (days) parts.push(`${days}d`);
-  if (hours || parts.length) parts.push(`${hours}h`);
-  if (minutes || parts.length) parts.push(`${minutes}m`);
-  if (!parts.length) parts.push(`${seconds}s`);
-  return parts.slice(0, 3).join(' ');
+
+  if (days > 0) {
+    return [days, hours, minutes, seconds]
+      .map((part) => String(part).padStart(2, '0'))
+      .join(':');
+  }
+
+  return [hours, minutes, seconds]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
 }
 
 function formatVersion(value) {
@@ -148,112 +158,159 @@ function announceImportantChanges(previous, snapshot) {
   }
 }
 
+function interfaceIcon(iface) {
+  const label = `${iface.friendly_name || ''} ${iface.name || ''} ${iface.network_name || ''}`.toLowerCase();
+  if (label.includes('wi-fi') || label.includes('wifi') || label.includes('wlan') || label.includes('ssid')) {
+    return { icon: 'wifi', tint: 'primary' };
+  }
+  if (label.includes('ethernet') || label.includes('eth')) {
+    return { icon: 'settings_ethernet', tint: 'secondary' };
+  }
+  if (label.includes('vpn') || label.includes('wireguard') || label.includes('tun')) {
+    return { icon: 'vpn_lock', tint: 'muted' };
+  }
+  if (label.includes('wwan') || label.includes('lte') || label.includes('mobile') || label.includes('cell')) {
+    return { icon: 'cell_tower', tint: 'primary' };
+  }
+  return { icon: 'cable', tint: 'primary' };
+}
+
+function buildStatusTone(snapshot) {
+  if (snapshot.last_error) {
+    return 'error';
+  }
+  if (snapshot.running) {
+    return 'running';
+  }
+  return 'stopped';
+}
+
+function buildSystemStatusLabel(snapshot) {
+  if (snapshot.last_error) {
+    return 'SYSTEM_ALERT';
+  }
+  if (snapshot.running) {
+    return 'SYSTEM_ONLINE';
+  }
+  return 'PROXY_STOPPED';
+}
+
+function buildHeroStatus(snapshot) {
+  if (snapshot.last_error) {
+    return 'Attention needed. Tray controls remain available.';
+  }
+  if (snapshot.running) {
+    return `Proxy running across ${snapshot.active_interfaces || 0} active interface${snapshot.active_interfaces === 1 ? '' : 's'}.`;
+  }
+  return 'Proxy stopped. Use the tray menu to review connectivity.';
+}
+
+function buildFooterText(snapshot) {
+  if (snapshot && snapshot.last_error) {
+    return 'Close this window to hide it. Tray controls stay available while the latest error is shown.';
+  }
+  return 'Close this window to hide it. Left-click the tray icon to bring it back.';
+}
+
+function setStatusTone(snapshot) {
+  const tone = buildStatusTone(snapshot);
+  elements.healthDot.dataset.state = tone;
+  elements.systemStatusPill.dataset.state = tone;
+  elements.systemStatus.textContent = buildSystemStatusLabel(snapshot);
+}
+
 function setErrorState(message) {
   if (message) {
     elements.errorBanner.textContent = message;
     elements.errorBanner.classList.remove('hidden');
-    elements.healthDot.classList.add('error');
   } else {
     elements.errorBanner.textContent = '';
     elements.errorBanner.classList.add('hidden');
-    elements.healthDot.classList.remove('error');
   }
 }
 
 function renderInterfaces(interfaces = []) {
-  const selected = interfaces.filter((item) => item.selected);
-  elements.interfacesMeta.textContent = `${selected.length} selected interface${selected.length === 1 ? '' : 's'}`;
+  const active = interfaces.filter((item) => item.alive);
+  elements.interfacesMeta.textContent = `${active.length} ACTIVE`;
 
-  if (!selected.length) {
+  if (!active.length) {
     state.lastIfaceKeys = '';
-    elements.interfacesList.innerHTML = '<div class="empty-state">No interfaces selected. Use the tray menu to choose which adapters contribute traffic.</div>';
+    elements.interfacesList.innerHTML = '<div class="pm-empty-state">No active network interfaces detected.</div>';
     return;
   }
 
-  const currentKeys = selected.map((iface) => iface.key).join(',');
+  const currentKeys = active.map((iface) => iface.key).join(',');
   const needsRebuild = currentKeys !== state.lastIfaceKeys;
 
   if (needsRebuild) {
     state.lastIfaceKeys = currentKeys;
-    elements.interfacesList.innerHTML = selected.map((iface) => {
-      const label = iface.friendly_name || iface.name || 'Unknown interface';
-      const ip = nonEmpty(iface.ip);
-      const networkName = iface.network_name ? escapeHtml(iface.network_name) : '';
-      const statusClass = iface.alive ? '' : ' down';
-      const statusText = iface.alive ? 'Online' : 'Offline';
-      const subline = networkName
-        ? `<span data-el="network-name">${networkName}</span> • <span data-el="ip">${escapeHtml(ip)}</span> • <span data-el="status-text">${statusText}</span>`
-        : `<span data-el="ip">${escapeHtml(ip)}</span> • <span data-el="status-text">${statusText}</span>`;
+    elements.interfacesList.innerHTML = active.map((iface) => {
+      const label = escapeHtml(iface.friendly_name || iface.name || 'Unknown interface');
+      const networkName = escapeHtml(iface.network_name || iface.gateway || 'Connected');
+      const ip = escapeHtml(nonEmpty(iface.ip));
+      const ratesUp = formatRate(iface.rate_sent);
+      const ratesDown = formatRate(iface.rate_recv);
+      const { icon, tint } = interfaceIcon(iface);
+      const iconClass = tint === 'secondary'
+        ? 'pm-interface-icon text-secondary bg-secondary/10 border-secondary/20'
+        : tint === 'muted'
+          ? 'pm-interface-icon text-gray-500 bg-gray-500/10 border-gray-500/20'
+          : 'pm-interface-icon text-primary bg-primary/10 border-primary/20';
+
       return `
-        <article class="interface-card" data-key="${escapeHtml(iface.key)}">
-          <div class="interface-card__name">
-            <span class="interface-status${statusClass}" data-el="status"></span>
-            <div>
-              <div class="interface-card__label">${escapeHtml(label)}</div>
-              <div class="interface-card__subline">${subline}</div>
+        <article class="pm-interface-card" data-key="${escapeHtml(iface.key)}">
+          <div class="${iconClass}">
+            <span class="material-symbols-outlined" aria-hidden="true">${icon}</span>
+          </div>
+          <div class="pm-interface-body">
+            <div class="pm-interface-ident">
+              <div class="pm-interface-name" data-el="name">${label}</div>
+              <div class="pm-interface-network" data-el="network">${networkName}</div>
             </div>
-          </div>
-          <div class="interface-card__rate interface-card__rate--up">
-            <span>↑</span><strong data-el="rate-up">${formatRate(iface.rate_sent)}</strong>
-          </div>
-          <div class="interface-card__total">
-            Total ↑ <strong data-el="total-up">${formatBytes(iface.bytes_sent)}</strong>
-          </div>
-          <div class="interface-card__rate interface-card__rate--down">
-            <span>↓</span><strong data-el="rate-down">${formatRate(iface.rate_recv)}</strong>
-          </div>
-          <div class="interface-card__total">
-            Total ↓ <strong data-el="total-down">${formatBytes(iface.bytes_recv)}</strong>
+            <div class="pm-interface-ip">
+              <div class="pm-interface-ip-label">IP_ADDR</div>
+              <div class="pm-interface-ip-value" data-el="ip">${ip}</div>
+            </div>
+            <div class="pm-interface-rates">
+              <span class="pm-interface-rate pm-interface-rate--up" data-el="rate-up">↑ ${ratesUp}</span>
+              <span class="pm-interface-rate pm-interface-rate--down" data-el="rate-down">↓ ${ratesDown}</span>
+            </div>
           </div>
         </article>`;
     }).join('');
     return;
   }
 
-  // Diff update: only change text content of existing cards
-  selected.forEach((iface) => {
+  active.forEach((iface) => {
     const card = elements.interfacesList.querySelector(`[data-key="${CSS.escape(iface.key)}"]`);
-    if (!card) return;
+    if (!card) {
+      state.lastIfaceKeys = '';
+      renderInterfaces(interfaces);
+      return;
+    }
 
-    const statusDot = card.querySelector('[data-el="status"]');
-    const statusTextEl = card.querySelector('[data-el="status-text"]');
+    const nameEl = card.querySelector('[data-el="name"]');
+    const networkEl = card.querySelector('[data-el="network"]');
     const ipEl = card.querySelector('[data-el="ip"]');
-    const networkNameEl = card.querySelector('[data-el="network-name"]');
     const rateUpEl = card.querySelector('[data-el="rate-up"]');
     const rateDownEl = card.querySelector('[data-el="rate-down"]');
-    const totalUpEl = card.querySelector('[data-el="total-up"]');
-    const totalDownEl = card.querySelector('[data-el="total-down"]');
 
-    if (statusDot) {
-      statusDot.className = iface.alive ? 'interface-status' : 'interface-status down';
-    }
-    if (statusTextEl) statusTextEl.textContent = iface.alive ? 'Online' : 'Offline';
+    if (nameEl) nameEl.textContent = iface.friendly_name || iface.name || 'Unknown interface';
+    if (networkEl) networkEl.textContent = iface.network_name || iface.gateway || 'Connected';
     if (ipEl) ipEl.textContent = nonEmpty(iface.ip);
-    if (iface.network_name && !networkNameEl) {
-      state.lastIfaceKeys = '';
-      renderInterfaces(interfaces);
-      return;
-    }
-    if (!iface.network_name && networkNameEl) {
-      state.lastIfaceKeys = '';
-      renderInterfaces(interfaces);
-      return;
-    }
-    if (networkNameEl) networkNameEl.textContent = iface.network_name;
-    if (rateUpEl) rateUpEl.textContent = formatRate(iface.rate_sent);
-    if (rateDownEl) rateDownEl.textContent = formatRate(iface.rate_recv);
-    if (totalUpEl) totalUpEl.textContent = formatBytes(iface.bytes_sent);
-    if (totalDownEl) totalDownEl.textContent = formatBytes(iface.bytes_recv);
+    if (rateUpEl) rateUpEl.textContent = `↑ ${formatRate(iface.rate_sent)}`;
+    if (rateDownEl) rateDownEl.textContent = `↓ ${formatRate(iface.rate_recv)}`;
   });
 }
 
 function updateGraphMeta(snapshot) {
   const maxTraffic = currentMaxTraffic();
+  const axisMax = formatRate(maxTraffic > 0 ? maxTraffic : 0);
+  const axisMid = formatRate(maxTraffic > 0 ? maxTraffic / 2 : 0);
   elements.legendUp.textContent = formatRate(snapshot ? snapshot.rate_sent : 0);
   elements.legendDown.textContent = formatRate(snapshot ? snapshot.rate_recv : 0);
-  elements.graphRange.textContent = state.prefersReducedMotion
-    ? 'Last 60 seconds · Reduced motion'
-    : 'Last 60 seconds';
+  elements.graphAxisMax.textContent = axisMax;
+  elements.graphAxisMid.textContent = axisMid;
 
   if (!snapshot) {
     elements.graphStatus.textContent = 'Waiting for live traffic data from the tray.';
@@ -274,28 +331,10 @@ function updateGraphMeta(snapshot) {
   }
 
   elements.graphStatus.textContent = state.prefersReducedMotion
-    ? 'Live traffic from the tray with motion reduced.'
+    ? 'Live traffic with reduced motion enabled.'
     : 'Live traffic from the tray.';
   elements.graphEmpty.classList.add('hidden');
   elements.chartDescription.textContent = `Traffic chart for the last 60 seconds. Current upload ${formatRate(snapshot.rate_sent)} and download ${formatRate(snapshot.rate_recv)}.`;
-}
-
-function buildHeroStatus(snapshot) {
-  if (snapshot.last_error) {
-    return 'Attention needed. Proxy controls stay available in the tray.';
-  }
-  if (snapshot.running) {
-    const count = snapshot.active_interfaces || 0;
-    return `Proxy running • ${count} active interface${count === 1 ? '' : 's'}`;
-  }
-  return 'Proxy stopped. Use the tray menu to review connectivity.';
-}
-
-function buildFooterText(snapshot) {
-  if (snapshot && snapshot.last_error) {
-    return 'Close this window to hide it. Tray controls stay available while the latest error is shown.';
-  }
-  return 'Close this window to hide it. Left-click the tray icon to bring it back.';
 }
 
 function renderSnapshot() {
@@ -305,12 +344,14 @@ function renderSnapshot() {
     return;
   }
 
+  setStatusTone(snapshot);
   elements.heroStatus.textContent = buildHeroStatus(snapshot);
-  elements.rateUp.textContent = formatRate(snapshot.rate_sent);
-  elements.rateDown.textContent = formatRate(snapshot.rate_recv);
+  elements.navRateUp.textContent = formatRate(snapshot.rate_sent);
+  elements.navRateDown.textContent = formatRate(snapshot.rate_recv);
   elements.mode.textContent = modeLabel(snapshot.mode);
-  elements.interfacesCount.textContent = `${snapshot.active_interfaces || 0} active`;
+  elements.interfacesCount.textContent = `${snapshot.active_interfaces || 0} ACTIVE`;
   elements.autoProxy.textContent = snapshot.win_proxy_auto ? 'Enabled' : 'Disabled';
+  elements.autoProxyToggle.dataset.enabled = snapshot.win_proxy_auto ? 'true' : 'false';
   elements.totalUpload.textContent = formatBytes(snapshot.bytes_sent);
   elements.totalDownload.textContent = formatBytes(snapshot.bytes_recv);
   elements.httpProxy.textContent = nonEmpty(snapshot.proxy_addr);
@@ -319,9 +360,11 @@ function renderSnapshot() {
   elements.totalConnections.textContent = `${snapshot.total_connections || 0}`;
   elements.uptime.textContent = formatDuration(snapshot.uptime);
   elements.version.textContent = formatVersion(snapshot.version);
+  elements.footerUptime.textContent = formatDuration(snapshot.uptime);
+  elements.footerVersion.textContent = formatVersion(snapshot.version);
   elements.footerText.textContent = buildFooterText(snapshot);
   setErrorState(snapshot.last_error);
-  renderInterfaces(snapshot.interfaces);
+  renderInterfaces(snapshot.interfaces || []);
 }
 
 function resizeCanvas() {
@@ -337,9 +380,9 @@ function resizeCanvas() {
 
 function drawGrid(ctx, width, height, padding) {
   ctx.save();
-  ctx.strokeStyle = 'rgba(139, 148, 158, 0.12)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
   ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i += 1) {
+  for (let i = 1; i <= 3; i += 1) {
     const y = padding.top + ((height - padding.top - padding.bottom) / 4) * i;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
@@ -369,7 +412,7 @@ function drawSeries(ctx, values, options) {
   ctx.lineWidth = 3;
   ctx.strokeStyle = color;
   ctx.shadowColor = color;
-  ctx.shadowBlur = 14;
+  ctx.shadowBlur = 16;
   ctx.stroke();
 
   ctx.lineTo(padding.left + innerWidth - offset, height - padding.bottom);
@@ -383,18 +426,6 @@ function drawSeries(ctx, values, options) {
   ctx.restore();
 }
 
-function drawLabels(ctx, width, height, padding, maxValue) {
-  ctx.save();
-  ctx.fillStyle = 'rgba(139, 148, 158, 0.92)';
-  ctx.font = '12px Segoe UI';
-  ctx.fillText(formatRate(maxValue > 0 ? maxValue : 0), padding.left, padding.top - 8);
-  ctx.fillText('0 B/s', padding.left, height - 8);
-  const label = 'Last 60 seconds';
-  const measure = ctx.measureText(label);
-  ctx.fillText(label, width - padding.right - measure.width, height - 8);
-  ctx.restore();
-}
-
 function drawGraph() {
   resizeCanvas();
   const ctx = elements.canvas.getContext('2d');
@@ -402,14 +433,14 @@ function drawGraph() {
     return;
   }
 
-  const dpr = window.devicePixelRatio || 1;
   const width = elements.canvas.width;
   const height = elements.canvas.height;
+  const dpr = window.devicePixelRatio || 1;
   const padding = {
-    top: 18 * dpr,
+    top: 16 * dpr,
     right: 16 * dpr,
-    bottom: 18 * dpr,
-    left: 16 * dpr,
+    bottom: 16 * dpr,
+    left: 54 * dpr,
   };
   const maxTraffic = currentMaxTraffic();
   const chartMax = Math.max(1, maxTraffic);
@@ -429,8 +460,8 @@ function drawGraph() {
       width,
       height,
       padding,
-      color: '#d2a8ff',
-      fillColor: 'rgba(210, 168, 255, 0.18)',
+      color: '#d575ff',
+      fillColor: 'rgba(213, 117, 255, 0.14)',
       offset,
       maxValue: chartMax,
     });
@@ -438,14 +469,12 @@ function drawGraph() {
       width,
       height,
       padding,
-      color: '#58a6ff',
-      fillColor: 'rgba(88, 166, 255, 0.18)',
+      color: '#99f7ff',
+      fillColor: 'rgba(153, 247, 255, 0.14)',
       offset,
       maxValue: chartMax,
     });
   }
-
-  drawLabels(ctx, width, height, padding, chartMax);
 }
 
 function stopFrame() {

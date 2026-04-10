@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PROXYMON | Network Monitor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-fixed-variant": "#006065",
+                    "on-secondary-container": "#fff5fc",
+                    "inverse-primary": "#006a70",
+                    "on-secondary-fixed": "#58007a",
+                    "tertiary-dim": "#47a2f8",
+                    "on-primary-container": "#00555a",
+                    "secondary": "#d575ff",
+                    "surface-container": "#1a1919",
+                    "surface-container-low": "#131313",
+                    "surface-dim": "#0e0e0e",
+                    "surface-bright": "#2c2c2c",
+                    "on-tertiary": "#003258",
+                    "on-secondary": "#390050",
+                    "primary-fixed": "#00f1fe",
+                    "on-error": "#490006",
+                    "tertiary-fixed-dim": "#4da8fe",
+                    "secondary-fixed-dim": "#eaaeff",
+                    "error-container": "#9f0519",
+                    "outline": "#767575",
+                    "on-tertiary-fixed": "#001930",
+                    "tertiary-fixed": "#6fb5ff",
+                    "primary-fixed-dim": "#00e2ee",
+                    "secondary-container": "#9800d0",
+                    "background": "#0e0e0e",
+                    "inverse-surface": "#fcf9f8",
+                    "outline-variant": "#484847",
+                    "on-secondary-fixed-variant": "#8300b4",
+                    "secondary-fixed": "#f0c1ff",
+                    "on-background": "#ffffff",
+                    "on-surface-variant": "#adaaaa",
+                    "on-primary": "#005f64",
+                    "primary": "#99f7ff",
+                    "surface": "#0e0e0e",
+                    "on-primary-fixed": "#004145",
+                    "on-error-container": "#ffa8a3",
+                    "surface-container-highest": "#262626",
+                    "primary-container": "#00f1fe",
+                    "primary-dim": "#00e2ee",
+                    "on-tertiary-container": "#002746",
+                    "tertiary-container": "#4da8fe",
+                    "surface-container-lowest": "#000000",
+                    "on-surface": "#ffffff",
+                    "secondary-dim": "#b90afc",
+                    "surface-container-high": "#201f1f",
+                    "surface-variant": "#262626",
+                    "surface-tint": "#99f7ff",
+                    "on-tertiary-fixed-variant": "#003b66",
+                    "tertiary": "#6fb5ff",
+                    "inverse-on-surface": "#565555",
+                    "error": "#ff716c",
+                    "error-dim": "#d7383b"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0px",
+                    "lg": "0px",
+                    "xl": "0px",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "body": ["Space Grotesk"],
+                    "label": ["Space Grotesk"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Space Grotesk', sans-serif; }
+        .glass-panel {
+            background: rgba(26, 25, 25, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(153, 247, 255, 0.1);
+        }
+        .speed-graph-line {
+            stroke-dasharray: 4;
+        }
+        @keyframes pulse-status {
+            0% { opacity: 0.4; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0.4; transform: scale(0.9); }
+        }
+        .status-dot {
+            animation: pulse-status 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background w-[1024px] h-[768px] overflow-hidden flex flex-col mx-auto border-x border-outline-variant/10">
+<!-- Top Navigation (Shared Component Integration) -->
+<nav class="fixed top-0 w-[1024px] z-50 rounded-none bg-[#0e0e0e]/80 backdrop-blur-md text-[#00f2ff] font-['Space_Grotesk'] tracking-tighter border-b border-[#00f2ff]/15 shadow-[0_0_40px_-15px_rgba(0,242,255,0.3)] flex justify-between items-center px-6 h-16">
+<div class="flex items-center gap-4">
+<span class="text-2xl font-black text-[#00f2ff] uppercase italic">PROXYMON</span>
+<div class="flex items-center gap-2 px-3 py-1 bg-surface-container-highest/50 border border-primary/20">
+<div class="w-2 h-2 rounded-full bg-emerald-500 status-dot"></div>
+<span class="text-[10px] font-bold tracking-[0.2em] uppercase text-emerald-400">System_Online</span>
+</div>
+</div>
+<div class="flex gap-8 items-center h-full">
+<a class="text-[#00f2ff] border-b-2 border-[#00f2ff] pb-1 font-bold text-sm uppercase" href="#">Nodes</a>
+<a class="text-gray-500 hover:text-[#00f2ff]/70 transition-all duration-200 hover:bg-[#1a1919] text-sm uppercase" href="#">Traffic</a>
+<a class="text-gray-500 hover:text-[#00f2ff]/70 transition-all duration-200 hover:bg-[#1a1919] text-sm uppercase" href="#">Logs</a>
+<a class="text-gray-500 hover:text-[#00f2ff]/70 transition-all duration-200 hover:bg-[#1a1919] text-sm uppercase" href="#">Rules</a>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex flex-col items-end mr-4">
+<div class="flex items-center gap-2 text-primary font-bold">
+<span class="material-symbols-outlined text-sm">arrow_upward</span>
+<span class="text-lg tabular-nums">2.4 MB/s</span>
+</div>
+<div class="flex items-center gap-2 text-secondary font-bold">
+<span class="material-symbols-outlined text-sm">arrow_downward</span>
+<span class="text-lg tabular-nums">15.1 MB/s</span>
+</div>
+</div>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-colors">settings</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary transition-colors">notifications</span>
+</div>
+</nav>
+<!-- Side Navigation (Shared Component Integration) -->
+<aside class="fixed left-[calc(50%-512px)] top-16 h-[calc(100vh-64px)] w-20 hover:w-64 transition-all duration-300 z-40 bg-[#1a1919] flex flex-col py-4 overflow-hidden border-r border-outline-variant/10 group">
+<div class="px-6 mb-8 flex items-center gap-4">
+<div class="w-8 h-8 bg-primary-container/20 flex items-center justify-center border border-primary/40 shrink-0">
+<span class="material-symbols-outlined text-primary-fixed">memory</span>
+</div>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity">
+<div class="text-[10px] font-bold tracking-widest uppercase text-primary">NODE_01</div>
+<div class="text-[8px] text-gray-500">ACTIVE_SECURE</div>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-1">
+<div class="flex items-center px-6 py-4 bg-[#00f2ff] text-[#0e0e0e] transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined mr-6">dashboard</span>
+<span class="font-['Space_Grotesk'] font-bold uppercase text-[10px] tracking-widest whitespace-nowrap">Dashboard</span>
+</div>
+<div class="flex items-center px-6 py-4 text-gray-400 hover:bg-[#262626] hover:text-[#00f2ff] transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined mr-6">language</span>
+<span class="font-['Space_Grotesk'] font-bold uppercase text-[10px] tracking-widest whitespace-nowrap">Global Proxy</span>
+</div>
+<div class="flex items-center px-6 py-4 text-gray-400 hover:bg-[#262626] hover:text-[#00f2ff] transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined mr-6">cable</span>
+<span class="font-['Space_Grotesk'] font-bold uppercase text-[10px] tracking-widest whitespace-nowrap">Tunneling</span>
+</div>
+<div class="flex items-center px-6 py-4 text-gray-400 hover:bg-[#262626] hover:text-[#00f2ff] transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined mr-6">hub</span>
+<span class="font-['Space_Grotesk'] font-bold uppercase text-[10px] tracking-widest whitespace-nowrap">Network Map</span>
+</div>
+<div class="flex items-center px-6 py-4 text-gray-400 hover:bg-[#262626] hover:text-[#00f2ff] transition-all duration-300 cursor-pointer">
+<span class="material-symbols-outlined mr-6">terminal</span>
+<span class="font-['Space_Grotesk'] font-bold uppercase text-[10px] tracking-widest whitespace-nowrap">Terminal</span>
+</div>
+</div>
+<div class="mt-auto px-4 pb-4 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="w-full py-2 bg-secondary-container text-white font-bold text-[10px] tracking-tighter uppercase hover:bg-secondary transition-colors">
+                RESTART SERVICE
+            </button>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="ml-20 mt-16 p-4 flex-1 flex flex-col gap-4 overflow-hidden">
+<!-- Top Row: Overview and Connection -->
+<div class="grid grid-cols-2 gap-4 h-[180px]">
+<!-- Overview Card -->
+<div class="glass-panel p-5 flex flex-col justify-between border-l-4 border-l-primary relative overflow-hidden">
+<div class="absolute top-[-20%] right-[-10%] w-32 h-32 bg-primary/5 blur-3xl"></div>
+<div class="flex justify-between items-start">
+<div>
+<span class="label-sm text-[10px] uppercase tracking-widest text-primary mb-1 block">System Overview</span>
+<h2 class="text-3xl font-black italic tracking-tighter">GLOBAL_TUNNEL</h2>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] text-gray-500 uppercase font-bold">Auto Proxy</span>
+<div class="w-10 h-5 bg-primary/20 border border-primary/30 p-0.5 flex items-center justify-end">
+<div class="w-3.5 h-3.5 bg-primary shadow-[0_0_10px_rgba(153,247,255,1)]"></div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4 mt-4">
+<div class="bg-surface-container-highest/40 p-3">
+<span class="text-[9px] uppercase text-gray-500 block mb-1">Total Data Out</span>
+<span class="text-xl font-bold tabular-nums">42.8 GB</span>
+</div>
+<div class="bg-surface-container-highest/40 p-3">
+<span class="text-[9px] uppercase text-gray-500 block mb-1">Total Data In</span>
+<span class="text-xl font-bold tabular-nums">1.2 TB</span>
+</div>
+</div>
+</div>
+<!-- Connection Card -->
+<div class="glass-panel p-5 flex flex-col justify-between border-l-4 border-l-secondary relative overflow-hidden">
+<div class="absolute top-[-20%] right-[-10%] w-32 h-32 bg-secondary/5 blur-3xl"></div>
+<div class="flex justify-between items-start">
+<div>
+<span class="label-sm text-[10px] uppercase tracking-widest text-secondary mb-1 block">Active Interface</span>
+<h2 class="text-3xl font-black italic tracking-tighter tabular-nums">127.0.0.1:7890</h2>
+</div>
+<div class="text-right">
+<span class="text-[10px] text-gray-500 uppercase font-bold">Version</span>
+<div class="text-xs font-bold font-mono">v4.12.0-STABLE</div>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-2 mt-4 text-center">
+<div class="bg-surface-container-highest/40 p-2">
+<span class="text-[9px] uppercase text-gray-500 block">Uptime</span>
+<span class="text-sm font-bold tabular-nums">04:12:35:01</span>
+</div>
+<div class="bg-surface-container-highest/40 p-2">
+<span class="text-[9px] uppercase text-gray-500 block">Active</span>
+<span class="text-sm font-bold tabular-nums">243</span>
+</div>
+<div class="bg-surface-container-highest/40 p-2 border-r border-secondary/20">
+<span class="text-[9px] uppercase text-gray-500 block">Total</span>
+<span class="text-sm font-bold tabular-nums">1,894</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Middle Row: Speed Graph (Data Monolith) -->
+<div class="flex-1 glass-panel p-4 relative flex flex-col">
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-xs font-black uppercase tracking-[0.3em] flex items-center gap-2">
+<span class="w-1.5 h-4 bg-primary"></span>
+                    Traffic Monitor <span class="text-gray-600 font-normal">[LAST 60S]</span>
+</h3>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<div class="w-3 h-0.5 bg-primary"></div>
+<span class="text-[9px] font-bold uppercase text-primary">Upload</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-0.5 bg-secondary"></div>
+<span class="text-[9px] font-bold uppercase text-secondary">Download</span>
+</div>
+</div>
+</div>
+<div class="flex-1 relative overflow-hidden border border-outline-variant/5 bg-surface-container-lowest">
+<!-- Abstract Graph Visual -->
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 200">
+<!-- Download (Secondary) -->
+<path class="text-secondary" d="M0 150 Q 50 130 100 160 T 200 140 T 300 170 T 400 120 T 500 140 T 600 100 T 700 130 T 800 110 T 900 150 T 1000 120" fill="none" stroke="currentColor" stroke-width="2"></path>
+<path class="text-secondary/10" d="M0 150 Q 50 130 100 160 T 200 140 T 300 170 T 400 120 T 500 140 T 600 100 T 700 130 T 800 110 T 900 150 T 1000 120 V 200 H 0 Z" fill="currentColor"></path>
+<!-- Upload (Primary) -->
+<path class="text-primary" d="M0 180 Q 50 175 100 185 T 200 170 T 300 190 T 400 175 T 500 182 T 600 165 T 700 188 T 800 172 T 900 185 T 1000 178" fill="none" stroke="currentColor" stroke-width="2"></path>
+<path class="text-primary/10" d="M0 180 Q 50 175 100 185 T 200 170 T 300 190 T 400 175 T 500 182 T 600 165 T 700 188 T 800 172 T 900 185 T 1000 178 V 200 H 0 Z" fill="currentColor"></path>
+<!-- Grid Lines -->
+<line stroke="rgba(255,255,255,0.05)" x1="0" x2="1000" y1="50" y2="50"></line>
+<line stroke="rgba(255,255,255,0.05)" x1="0" x2="1000" y1="100" y2="100"></line>
+<line stroke="rgba(255,255,255,0.05)" x1="0" x2="1000" y1="150" y2="150"></line>
+</svg>
+<!-- Axis Labels -->
+<div class="absolute left-2 top-2 text-[8px] text-gray-600 font-mono flex flex-col gap-8">
+<span>20 MB/s</span>
+<span>10 MB/s</span>
+<span>0 MB/s</span>
+</div>
+</div>
+</div>
+<!-- Bottom Row: Interfaces Panel -->
+<div class="h-[220px] glass-panel p-4 flex flex-col">
+<div class="flex justify-between items-center mb-3">
+<h3 class="text-xs font-black uppercase tracking-[0.3em]">Network_Interfaces</h3>
+<span class="text-[9px] font-bold text-primary px-2 bg-primary/10 border border-primary/20">4 ACTIVE</span>
+</div>
+<div class="flex-1 grid grid-cols-2 gap-4 overflow-hidden">
+<!-- Interface 1 -->
+<div class="bg-surface-container-high/60 border border-outline-variant/10 p-3 flex items-center gap-4">
+<div class="p-2 bg-primary/10">
+<span class="material-symbols-outlined text-primary text-xl">wifi</span>
+</div>
+<div class="flex-1 grid grid-cols-3 items-center">
+<div class="col-span-1">
+<div class="text-[10px] font-bold">WLAN0</div>
+<div class="text-[9px] text-gray-500 font-mono truncate">CyberNode_5G</div>
+</div>
+<div class="text-center">
+<div class="text-[9px] text-gray-600 uppercase">IP_ADDR</div>
+<div class="text-[10px] font-mono">192.168.1.42</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] font-bold text-primary tabular-nums">↑ 1.2 MB/s</div>
+<div class="text-[10px] font-bold text-secondary tabular-nums">↓ 14.8 MB/s</div>
+</div>
+</div>
+</div>
+<!-- Interface 2 -->
+<div class="bg-surface-container-high/60 border border-outline-variant/10 p-3 flex items-center gap-4">
+<div class="p-2 bg-secondary/10">
+<span class="material-symbols-outlined text-secondary text-xl">settings_ethernet</span>
+</div>
+<div class="flex-1 grid grid-cols-3 items-center">
+<div class="col-span-1">
+<div class="text-[10px] font-bold">ETH0</div>
+<div class="text-[9px] text-gray-500 font-mono">Backbone_Alpha</div>
+</div>
+<div class="text-center">
+<div class="text-[9px] text-gray-600 uppercase">IP_ADDR</div>
+<div class="text-[10px] font-mono">10.0.0.125</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] font-bold text-primary tabular-nums">↑ 0.8 MB/s</div>
+<div class="text-[10px] font-bold text-secondary tabular-nums">↓ 0.1 MB/s</div>
+</div>
+</div>
+</div>
+<!-- Interface 3 -->
+<div class="bg-surface-container-high/60 border border-outline-variant/10 p-3 flex items-center gap-4 opacity-50">
+<div class="p-2 bg-gray-500/10">
+<span class="material-symbols-outlined text-gray-500 text-xl">vpn_lock</span>
+</div>
+<div class="flex-1 grid grid-cols-3 items-center">
+<div class="col-span-1">
+<div class="text-[10px] font-bold">TUN0</div>
+<div class="text-[9px] text-gray-500 font-mono">Wireguard_Primary</div>
+</div>
+<div class="text-center">
+<div class="text-[9px] text-gray-600 uppercase">IP_ADDR</div>
+<div class="text-[10px] font-mono">10.66.66.2</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] font-bold text-gray-500 uppercase">INACTIVE</div>
+</div>
+</div>
+</div>
+<!-- Interface 4 -->
+<div class="bg-surface-container-high/60 border border-outline-variant/10 p-3 flex items-center gap-4">
+<div class="p-2 bg-primary/10">
+<span class="material-symbols-outlined text-primary text-xl">cell_tower</span>
+</div>
+<div class="flex-1 grid grid-cols-3 items-center">
+<div class="col-span-1">
+<div class="text-[10px] font-bold">WWAN0</div>
+<div class="text-[9px] text-gray-500 font-mono">LTE_Failover</div>
+</div>
+<div class="text-center">
+<div class="text-[9px] text-gray-600 uppercase">IP_ADDR</div>
+<div class="text-[10px] font-mono">100.72.14.8</div>
+</div>
+<div class="text-right">
+<div class="text-[10px] font-bold text-primary tabular-nums">↑ 0.4 MB/s</div>
+<div class="text-[10px] font-bold text-secondary tabular-nums">↓ 0.2 MB/s</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="flex justify-between items-center py-2 px-1">
+<div class="flex items-center gap-6">
+<div class="text-[9px] text-gray-600 font-bold tracking-widest uppercase">
+                    Kernel_Time: <span class="text-gray-400">144:12:05</span>
+</div>
+<div class="text-[9px] text-gray-600 font-bold tracking-widest uppercase">
+                    Enc_Prot: <span class="text-gray-400">AES-256-GCM</span>
+</div>
+</div>
+<button class="bg-primary text-on-primary font-black px-8 py-2 text-[10px] tracking-[0.2em] uppercase hover:bg-primary-dim active:scale-95 transition-all">
+                RESET STATS
+            </button>
+</footer>
+</main>
+<!-- Visual Polish: Glitch Textures / Overlay -->
+<div class="fixed inset-0 pointer-events-none z-[100] opacity-[0.03]" data-alt="subtle dark carbon fiber micro texture overlay for digital screen effect" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuATA6vBV9Wjeg4CKtsyjXU2TwGHaY8ulpurybxULUOOs5BY3zrqgvIFRpCWP9hn9WC-m9H0brQbBdisAkxD442v41t-dQLVd6Yu3i5AycHBjvUgcFbU_Wkuh-YSUd_KXYiTtUMA1XeolPT9VbuJXyMuq9wEbHCcDB-R6cymQ9u83IUIEEWWAjhLmIIHIKEsqnvza4lQ_MMs7xe5RzaoOZTvVfm_LyeJddtN9jmhxOVoiAvXhl2kC7GBQChL_IAoZwid3YdjIEomWgpg');"></div>
+</body></html>
