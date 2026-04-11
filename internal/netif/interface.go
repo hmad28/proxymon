@@ -1,7 +1,6 @@
 package netif
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -146,21 +145,3 @@ func CheckHealth(ni *NetInterface) bool {
 	return true
 }
 
-// Monitor periodically checks the health of all interfaces and updates their status.
-func Monitor(ctx context.Context, interfaces []*NetInterface, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			RefreshNetworkNames(interfaces)
-			for _, ni := range interfaces {
-				alive := CheckHealth(ni)
-				ni.SetAlive(alive)
-			}
-		}
-	}
-}

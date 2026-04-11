@@ -6,6 +6,7 @@
 *.dylib
 bin/
 proxymon.exe
+proxymon.exe - Shortcut.lnk
 
 # Claude
 .claude/

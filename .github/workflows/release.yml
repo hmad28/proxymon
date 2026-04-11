@@ -22,13 +22,13 @@ jobs:
 
       - name: Build
         run: |
-          GOOS=windows GOARCH=amd64 go build -v -o venn.exe ./cmd/
+          GOOS=windows GOARCH=amd64 go build -v -o proxymon.exe ./cmd/
 
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: venn.exe
+          files: proxymon.exe
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

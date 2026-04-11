@@ -37,11 +37,11 @@ type perIfaceEntry struct {
 	current    InterfaceTrafficSnapshot
 }
 
-// PerInterfaceTracker tracks OS-level NIC traffic broken down per LUID.
 type PerInterfaceTracker struct {
-	mu       sync.RWMutex
-	interval time.Duration
-	entries  map[uint64]*perIfaceEntry
+	mu          sync.RWMutex
+	interval    time.Duration
+	entries     map[uint64]*perIfaceEntry
+	activeLUIDs []uint64
 }
 
 // NewSystemTrafficTracker creates a tracker for system-wide network traffic.
@@ -167,8 +167,12 @@ func (t *PerInterfaceTracker) ResetBaseline(luids []uint64) error {
 	if t.entries == nil {
 		t.entries = make(map[uint64]*perIfaceEntry, len(luids))
 	}
+	t.activeLUIDs = append([]uint64(nil), luids...)
 	for _, luid := range luids {
-		sample := samples[luid]
+		sample, ok := samples[luid]
+		if !ok {
+			continue
+		}
 		entry := t.entries[luid]
 		if entry == nil {
 			entry = &perIfaceEntry{}
@@ -186,8 +190,15 @@ func (t *PerInterfaceTracker) ResetBaseline(luids []uint64) error {
 	return nil
 }
 
+// UpdateLUIDs updates the monitored LUIDs dynamically.
+func (t *PerInterfaceTracker) UpdateLUIDs(luids []uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.activeLUIDs = append([]uint64(nil), luids...)
+}
+
 // Monitor periodically refreshes per-interface traffic totals.
-func (t *PerInterfaceTracker) Monitor(ctx context.Context, luids []uint64, interval time.Duration) {
+func (t *PerInterfaceTracker) Monitor(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
 		interval = time.Second
 	}
@@ -196,7 +207,7 @@ func (t *PerInterfaceTracker) Monitor(ctx context.Context, luids []uint64, inter
 	t.interval = interval
 	t.mu.Unlock()
 
-	if err := t.refresh(luids, true); err != nil {
+	if err := t.refresh(true); err != nil {
 		return
 	}
 
@@ -208,12 +219,16 @@ func (t *PerInterfaceTracker) Monitor(ctx context.Context, luids []uint64, inter
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_ = t.refresh(luids, false)
+			_ = t.refresh(false)
 		}
 	}
 }
 
-func (t *PerInterfaceTracker) refresh(luids []uint64, setBaseline bool) error {
+func (t *PerInterfaceTracker) refresh(setBaseline bool) error {
+	t.mu.RLock()
+	luids := append([]uint64(nil), t.activeLUIDs...)
+	t.mu.RUnlock()
+
 	samples, err := readInterfaceSamples(luids)
 	if err != nil {
 		return err
@@ -231,10 +246,16 @@ func (t *PerInterfaceTracker) refresh(luids []uint64, setBaseline bool) error {
 	}
 
 	for _, luid := range luids {
-		sample := samples[luid]
+		sample, ok := samples[luid]
+		if !ok {
+			continue
+		}
 		entry := t.entries[luid]
 		if entry == nil {
-			entry = &perIfaceEntry{}
+			entry = &perIfaceEntry{
+				baseline:   [2]uint64{sample[0], sample[1]},
+				lastSample: [2]uint64{sample[0], sample[1]},
+			}
 			t.entries[luid] = entry
 		}
 

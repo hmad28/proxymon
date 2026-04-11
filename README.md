@@ -1,113 +1,137 @@
 # Proxymon
 
-Proxymon is a Windows multi-ISP proxy monitor and traffic balancer with a system tray app and a real-time dashboard.
+Proxymon is a Windows tray application that runs a local HTTP CONNECT and SOCKS5 proxy, binds outbound traffic to selected network interfaces, and shows live traffic through a dashboard.
 
-It binds outbound proxy traffic to selected network interfaces, lets you switch balancing modes from the tray, and shows both aggregate and per-interface traffic in a live dashboard.
+It is built for multi-ISP and multi-adapter setups where you want to switch interfaces, choose balancing behavior, and monitor throughput from one place.
 
 ## Features
 
-- Windows system tray application
-- WebView2-powered real-time dashboard when CGO is enabled
+- Windows system tray app with left-click dashboard access and right-click quick actions
+- HTTP CONNECT proxy with a companion SOCKS5 endpoint
+- Round-robin and failover balancing modes
+- Interface selection from the tray menu
+- Windows auto-proxy toggle
+- Live aggregate and per-interface traffic monitoring using Windows network counters
+- WebView2 dashboard when CGO is enabled
 - Native dashboard fallback when CGO is disabled
-- HTTP CONNECT proxy plus SOCKS5 proxy endpoint
-- Multi-interface balancing with round-robin and failover modes
-- Real NIC traffic monitoring per interface using Windows OS counters
-- Live per-interface upload/download rates and totals
-- Wi-Fi SSID display for wireless adapters
-- Ethernet adapter/network description display with gateway context
-- Windows proxy auto-enable option
-- Resettable traffic totals from the dashboard and tray
+- Periodic interface rediscovery for Wi-Fi/IP changes and newly active adapters
+- Automatic settings migration from the old Venn config path
 
 ## Requirements
 
 - Windows 10 or later
 - Go 1.25+
-- MinGW-w64 in PATH for CGO/WebView builds
-- WebView2 runtime installed on the machine for the WebView dashboard
+- WebView2 runtime for the WebView dashboard build
+- MinGW-w64 in `PATH` if you want the CGO/WebView build
 
-## Installation and Build
+## Project layout
 
-### 1. Install MinGW-w64
+- `cmd/main.go` — application entrypoint, logging, startup, and shutdown handling
+- `internal/app/` — runtime controller, snapshots, configuration application, hotplug refresh
+- `internal/tray/` — systray app, menu actions, dashboard provider selection, popup errors
+- `internal/dashboard/` — embedded WebView2 dashboard assets and bridge
+- `internal/proxy/` — HTTP CONNECT and SOCKS5 proxy server
+- `internal/netif/` — interface discovery, health checks, Windows traffic counters, Wi-Fi metadata
+- `internal/winproxy/` — Windows proxy backup, enable, restore, and disable helpers
+- `internal/config/` — persisted settings store
+- `third_party/systray/` — local systray dependency override used by the project
 
-If you use Scoop:
+## Configuration
 
-```bash
-scoop install mingw
+Proxymon stores settings in:
+
+```text
+%AppData%/proxymon/settings.json
 ```
 
-Then ensure MinGW is on PATH:
+On first load it will migrate settings from the legacy path if this file exists:
 
-```bash
-export PATH="/c/Users/Pongo/scoop/apps/mingw/current/bin:$PATH"
+```text
+%AppData%/venn-combine-connection/settings.json
 ```
 
-### 2. Build with WebView dashboard enabled
+Persisted settings include:
+
+- proxy listen address
+- selected interfaces
+- balancing mode
+- Windows auto-proxy state
+
+## Build
+
+### Build with WebView2 dashboard
 
 ```bash
 export PATH="/c/Users/Pongo/scoop/apps/mingw/current/bin:$PATH"
 CGO_ENABLED=1 CC=gcc CXX=g++ go build -ldflags "-H=windowsgui" -o proxymon.exe ./cmd
 ```
 
-### 3. Build native fallback without CGO
+### Build with native fallback dashboard
 
 ```bash
 CGO_ENABLED=0 go build -ldflags "-H=windowsgui" -o proxymon.exe ./cmd
 ```
 
-### 4. Validate the build
+### Validate the codebase
 
 ```bash
-export PATH="/c/Users/Pongo/scoop/apps/mingw/current/bin:$PATH"
-CGO_ENABLED=1 CC=gcc CXX=g++ go vet ./...
-CGO_ENABLED=0 go vet ./...
+go build ./...
 ```
 
-## Usage
+## Run
 
-### Start Proxymon
+### Start the app
 
 ```bash
 ./proxymon.exe
 ```
 
-### Tray controls
+### Available flags
 
-After launch, Proxymon runs in the Windows system tray.
+```bash
+./proxymon.exe -addr 127.0.0.1:1080
+./proxymon.exe -version
+```
 
-- **Left-click** the tray icon to open or focus the dashboard
-- **Right-click** the tray icon to open the tray menu
-- Use the tray menu to:
+Default listen address:
+
+```text
+127.0.0.1:1080
+```
+
+The SOCKS5 listener runs on the next port, so the default SOCKS5 endpoint is `127.0.0.1:1081`.
+
+## Tray behavior
+
+After launch, Proxymon runs in the Windows tray.
+
+- **Left-click** opens or focuses the dashboard
+- **Right-click** opens the tray menu
+- The tray menu lets you:
   - choose active interfaces
   - switch between round-robin and failover
   - enable or disable Windows auto-proxy
-  - reset traffic stats
+  - reset stats
   - quit the app
 
-### Dashboard
+If only one interface is selected, Proxymon forces failover mode automatically.
+
+## Dashboard
 
 The dashboard shows:
 
 - current proxy status
-- total upload and download throughput
-- last 60 seconds of traffic history
-- proxy endpoints and connection counts
+- current upload and download rate
+- traffic history
+- total uploaded and downloaded bytes
+- active and total connection counts
 - uptime and version
-- per-interface traffic totals and rates
-- Wi-Fi SSID or Ethernet network/adapter description
+- active interface details, including IP, gateway, and network name
 - latest runtime errors
-
-### Version output
-
-```bash
-./proxymon.exe -version
-```
-
-## Screenshot
-
-_Screenshot placeholder: add tray + dashboard screenshot here._
 
 ## Notes
 
-- `proxymon.exe` is ignored by git and should not be committed.
-- The CGO build gives you the WebView dashboard.
-- The non-CGO build keeps the tray app working with the native fallback dashboard.
+- `go build ./...` passes for the current repository state.
+- The WebView dashboard is only built when CGO is enabled.
+- The non-CGO build keeps the tray app working through the native dashboard fallback.
+- The release workflow publishes `proxymon.exe` for tagged releases.

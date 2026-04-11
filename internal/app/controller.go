@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -192,7 +193,7 @@ func (c *Controller) EmergencyDisableProxy() {
 }
 
 func InterfaceKey(iface *netif.NetInterface) string {
-	return fmt.Sprintf("%s|%s", iface.Name, iface.IP.String())
+	return iface.Name
 }
 
 func DisplayName(iface *netif.NetInterface) string {
@@ -200,6 +201,14 @@ func DisplayName(iface *netif.NetInterface) string {
 		return iface.FriendlyName
 	}
 	return iface.Name
+}
+
+func canonicalizeInterfaceKey(key string) string {
+	key = strings.TrimSpace(key)
+	if idx := strings.IndexByte(key, '|'); idx >= 0 {
+		key = key[:idx]
+	}
+	return strings.TrimSpace(key)
 }
 
 func (c *Controller) applyLoadedSettings(proxyAddr string, settings cfg.Settings) {
@@ -221,15 +230,19 @@ func (c *Controller) normalizeConfig(next Config) Config {
 	}
 
 	seen := make(map[string]bool)
+	selectedSeen := make(map[string]bool)
 	var valid []string
 	for _, iface := range c.allIfaces {
 		key := InterfaceKey(iface)
 		seen[key] = true
 	}
 	for _, key := range next.SelectedInterfaceKeys {
-		if seen[key] {
-			valid = append(valid, key)
+		key = canonicalizeInterfaceKey(key)
+		if key == "" || !seen[key] || selectedSeen[key] {
+			continue
 		}
+		selectedSeen[key] = true
+		valid = append(valid, key)
 	}
 	if len(valid) == 0 && len(c.allIfaces) > 0 {
 		valid = []string{InterfaceKey(c.allIfaces[0])}
@@ -316,9 +329,9 @@ func (c *Controller) startLocked() error {
 		}
 	}
 
-	go netif.Monitor(runCtx, c.allIfaces, 15*time.Second)
+	go c.watchInterfaces(runCtx)
 	go c.systemTraffic.Monitor(runCtx, 2*time.Second)
-	go c.perIfaceTracker.Monitor(runCtx, allLUIDs, 2*time.Second)
+	go c.perIfaceTracker.Monitor(runCtx, 2*time.Second)
 	go func(server *proxy.Server, ctx context.Context) {
 		if err := server.Start(ctx); err != nil {
 			c.mu.Lock()
@@ -401,4 +414,41 @@ func (c *Controller) sendEventLocked(title, message string) {
 func cloneConfig(cfg Config) Config {
 	cfg.SelectedInterfaceKeys = append([]string(nil), cfg.SelectedInterfaceKeys...)
 	return cfg
+}
+
+func (c *Controller) watchInterfaces(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			ifaces, err := netif.Discover()
+			if err != nil {
+				continue
+			}
+
+			netif.RefreshNetworkNames(ifaces)
+			for _, ni := range ifaces {
+				ni.SetAlive(netif.CheckHealth(ni))
+			}
+
+			c.mu.Lock()
+			c.allIfaces = ifaces
+
+			selected := c.selectedIfacesLocked()
+			allLUIDs := c.allInterfaceLUIDsLocked()
+
+			if c.bal != nil {
+				c.bal.SetInterfaces(selected)
+			}
+
+			if c.perIfaceTracker != nil {
+				c.perIfaceTracker.UpdateLUIDs(allLUIDs)
+			}
+			c.mu.Unlock()
+		}
+	}
 }

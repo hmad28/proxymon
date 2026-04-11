@@ -1,39 +1,35 @@
-# Rencana Redesign Dashboard Proxymon (Helicopter View)
+# Rencana Perbaikan Auto-Detect Network Interface (Hotplug/WiFi Change)
 
-## 1. Mencegah Konten Terpotong (Helicopter View & Fixed Size)
-Tujuan utama ini adalah memastikan semua elemen (Overview, Grafik, dan Interfaces) terlihat sempurna dalam ukuran window yang *fixed*, tanpa ada bagian yang terpotong keluar dari kotak seperti yang terlihat pada screenshot.
+## Ringkasan Masalah
+Saat ini, aplikasi `multi-isp-proxy` (Proxymon) hanya melakukan deteksi antarmuka jaringan (network interface) beserta alamat IP-nya **satu kali** pada saat aplikasi pertama kali dijalankan (di dalam `app.NewController`). 
 
-**Langkah Penyesuaian Ruang & Layout:**
-- **Atas (System Overview & Proxy Endpoint):**
-  - **Masalah saat ini:** Menggunakan *fixed height* `h-[180px]`, sehingga konten di bagian bawah kartu (Socks5, Status, Active Interfaces) terpotong dan tidak terlihat.
-  - **Solusi:** Menghapus paksaan tinggi `h-[180px]`. Kita akan mengubahnya menjadi `h-auto` (menyesuaikan isi) atau mengatur ulang padding (`p-5` menjadi `p-4`) dan jarak (`mb-4` menjadi `mb-2`) agar seluruh metrik muat secara nyaman dalam kartu tanpa memakan terlalu banyak ruang vertikal.
-- **Tengah (Traffic Monitor / Grafik):**
-  - **Masalah saat ini:** Memakan terlalu banyak ruang (`flex-1` yang tidak diimbangi dengan batas atas/bawah) atau scaling SVG yang salah.
-  - **Solusi:** Memberikan *min-height* atau batas tinggi konstan pada kontainer grafik (misalnya `h-[160px]`), dan memastikan margin di sekitarnya ringkas. Ini memberi kepastian ukuran sehingga tidak menekan elemen di bawahnya.
-- **Bawah (Network Interfaces):**
-  - **Masalah saat ini:** Tinggi dipatok tetap `h-[220px]`.
-  - **Solusi:** Menjadikan kartu-kartu interface lebih pipih (mengurangi internal padding menjadi `p-2`) sehingga pada mode *fixed window*, 2 baris interface tetap muat secara utuh. Jika jumlah interface berlebih, list ini akan memiliki internal-scroll yang rapi (`overflow-y-auto`), sementara sisa window-nya tetap *fixed size*.
+Akibatnya:
+1. Jika pengguna pindah koneksi Wi-Fi (IP berubah), aplikasi masih menyimpan status IP lama yang menyebabkan antarmuka mati/tidak stabil di level Proxy.
+2. `PerInterfaceTracker` memonitor *LUID* antarmuka secara statis berdasarkan data saat *startup*. Jika ada *interface* baru yang diaktifkan (misal tethering lewat USB), ia tidak akan pernah terlacak trafiknya.
+3. Kunci identifikasi interface (`InterfaceKey`) menggunakan format `[Nama Interface]|[IP Address]`. Jika IP Address berubah saat *reconnect* Wi-Fi, aplikasi menganggapnya sebagai interface target yang sama sekali berbeda, sehingga interface gagal terpilih (hilang).
 
-## 2. Menghapus Semua Tombol yang Tidak Berguna (Useless Elements)
-Untuk membuat desain "Clean" dan memberikan ruang yang lebih luas untuk data trafik, semua mockup/elemen navigasi yang tidak berfungsi akan dibersihkan:
-- **Hapus Sidebar Kiri (`<aside>`):** Seluruh panel navigasi vertikal di pinggir layar akan dibuang. Ini akan membebaskan *margin-left* sebesar 80px (`ml-20`), sehingga konten utama akan lebih lebar.
-- **Hapus Ikon Header:** Ikon "Settings" dan "Notifications" (Bell) di bagian pojok kanan atas akan dibuang.
-- **Hapus Menu Header:** Link dummy seperti "Nodes", "Traffic", "Logs", "Rules" di posisi tengah navigasi atas akan dibuang karena semuanya memutar ke dashboard utama.
-- **Evaluasi Tombol Footer:** "Reset Stats" masih dipertahankan apabila dibutuhkan secara fungsional, namun ruang footer akan dirampingkan lebih lanjut (padding lebih kecil).
+## Solusi Teknis (Implementation Plan)
 
-## 3. Tahapan Eksekusi pada Codebase
+### Fase 1: Membuat Identifikasi Interface yang Stabil
+- **Target File:** `internal/app/controller.go`
+- **Tindakan:** Mengubah `InterfaceKey(iface *netif.NetInterface) string`. Hilangkan `iface.IP.String()` dan gunakan `iface.Name` (contoh: "Wi-Fi" atau "Ethernet") sebagai kunci unik statis. 
+*(Windows menggunakan identifikasi nama interface yang persisten. Jika IP berubah tetapi fisik interface-nya sama, ia tetap mempertahankan nama "Wi-Fi").*
 
-**Fase 1: Memperbaiki Template `new-design.html`**
-Kita akan mengubah file dummy/template ini terlebih dahulu.
-1. Hapus `<aside>` dan elemen navbar tidak penting.
-2. Hapus class `ml-20` dari `<main>`, ubah layout responsif supaya mengisi 100% lebar (dikurangi padding edge).
-3. Hapus kelas tinggi yang memotong konten (`h-[180px]` dan `h-[220px]`). Update ke `min-h-min flex flex-col` supaya data yang ditambahkan di dalam card muat.
-4. Sesuaikan padding (`p-x`) agar ruang kosong terpakai lebih efisien.
+### Fase 2: Dynamic Interface Discovery di Controller
+- **Target File:** `internal/app/controller.go`
+- **Tindakan:** 
+  1. Hentikan pemanggilan `go netif.Monitor(...)` yang ada di `startLocked()`. Fungsi lama ini hanya mem-ping list device yang sifatnya statis.
+  2. Implementasikan routine baru `go c.watchInterfaces(runCtx)` di dalam `Controller`. Routine ini akan berjalan berkala (setiap 5-10 detik) untuk:
+     - Memanggil `netif.Discover()` agar mendapat daftar antarmuka / IP Address yang terbaru.
+     - Memanggil `CheckHealth` untuk memastikan status online (`Alive`).
+     - Memeluk *Lock* (`c.mu.Lock()`) dan melakukan penggantian `c.allIfaces` secara transparan.
 
-**Fase 2: Porting Layout ke Dashboard Aplikasi**
-1. Ganti semua HTML di `internal/dashboard/assets/index.html` dengan HTML dari `new-design.html` yang sudah bersih dan rapi.
-2. Pindahkan styling Tailwind ke dalam `internal/dashboard/assets/style.css` atau biarkan tetap dengan properti CDN + Tailwind Config.
-3. Update `app.js` untuk membidik query selector dari HTML baru. (Tanpa logika filter manual lagi, langsung iterasi `snapshot` ke UI Helicopter View yang baru).
+### Fase 3: Update Tracker & Balancer Secara Dinamis (No App Restart)
+- **Target File:** `internal/app/controller.go` dan `internal/netif/traffic_windows.go`
+- **Tindakan:** 
+  - Saat `c.allIfaces` terganti dalam loop `watchInterfaces`, kita mengkueri interface yang aktif `c.selectedIfacesLocked()` dengan IP baru.
+  - Memanggil `c.bal.SetInterfaces(newSelected)` untuk *hot-reload* konfigurasi balancer supaya load balancer me-link ke IP baru secara instan.
+  - Memodifikasi `PerInterfaceTracker` agar loop `Monitor`-nya dapat menerima update list kumpulan LUID (ID network adapter) yang dinamis. 
 
---------------------
-_Plan ini sudah menyesuaikan kebutuhan Anda untuk fokus pada Helicopter View yang pas-layar (tidak *clipping*) dan membuang elemen "sampah" (useless)._
+---
+*Bila setuju dengan pendekatan ini, kamu tidak perlu memencet Reset App lagi waktu berpindah Wi-Fi. Semua layer data, grafik, balancer akan otomatis sinkron mengikut state jaringan lokal kamu!*
